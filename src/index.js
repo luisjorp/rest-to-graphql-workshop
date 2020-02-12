@@ -1,6 +1,6 @@
 const fetch = require("node-fetch");
 const {ApolloServer, gql} = require("apollo-server");
-
+const {find, filter} = require('lodash');
 // This is a (sample) collection of books we'll be able to query
 // the GraphQL server for.  A more complete example might fetch
 // from an existing data source like a REST API or database.
@@ -44,29 +44,44 @@ const typeDefs = gql`
 
     # This "Book" type can be used in other type declarations.
     type Book {
-      title: String
-      author: String
+        title: String
+        author: String
     }
 
     enum characterStatus {
-      Alive
-      Dead
-      Unknown
+        Alive
+        Dead
+        Unknown
     }
-    
+
     type Character {
-      name: String
-      id: ID
-      status: characterStatus
-      episodes: [String]
+        name: String
+        id: ID
+        image: String
+        status: characterStatus
+        episodes: [Episode]
+    }
+
+    type Episode {
+        id: ID
+        name: String
+        air_date: String
+        url: String
+        characters: [Character]
     }
 
 
     # The "Query" type is the root of all GraphQL queries.
     # (A "Mutation" type will be covered later on.)
     type Query {
-      books: [Book]
-      characters: [Character]
+        books: [Book]
+
+        characters: [Character]
+        character(id: ID!): Character
+
+        episodes: [Episode]
+        episode(id: ID!): Episode
+
     }
 `;
 
@@ -75,8 +90,33 @@ const typeDefs = gql`
 const resolvers = {
   Query: {
     books: () => books,
-    // characters: () => characters
-    characters: () => fetchCharacters()
+
+    characters: () => fetchCharacters(),
+    character: (parent, args, context, info) => {
+      const {id} = args;
+      return fetchCharacterById(id);
+    },
+
+    episodes: () => fetchEpisodes(),
+    episode: (parent, args, context, info) => {
+      const {id} = args;
+      return fetchEpisodeById(id)
+    }
+
+  },
+  Character: {
+    episodes(character) {
+      return character.episode.map(url => {
+        return fetchEpisodeByUrl(url)
+      })
+    }
+  },
+  Episode: {
+    characters(episode){
+      return episode.characters.map(url => {
+        return fetchCharacterByUrl(url)
+      })
+    }
   }
 };
 
@@ -90,7 +130,6 @@ const server = new ApolloServer({typeDefs, resolvers});
 server.listen().then(({url}) => {
   console.log(`🚀  Server ready at ${url}`);
 });
-
 
 
 // mock data for episodes
